@@ -26,10 +26,23 @@ class AuthController extends Controller
             'password' => Hash::make($data['password']),
         ]);
 
+        $user->sendEmailVerificationNotification();
+
         return response()->json([
             'user' => $user,
             'token' => $user->createToken('chat')->plainTextToken,
         ], 201);
+    }
+
+    public function resendVerification(Request $request)
+    {
+        if ($request->user()->hasVerifiedEmail()) {
+            return response()->json(['message' => 'Tu correo ya está confirmado.']);
+        }
+
+        $request->user()->sendEmailVerificationNotification();
+
+        return response()->json(['message' => 'Te enviamos un nuevo correo de confirmación.']);
     }
 
     public function login(Request $request)
