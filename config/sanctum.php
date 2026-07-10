@@ -84,4 +84,17 @@ return [
         'validate_csrf_token' => ValidateCsrfToken::class,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Idle Session Timeout
+    |--------------------------------------------------------------------------
+    |
+    | Number of minutes of inactivity allowed before a token's session is
+    | considered stale and revoked by the EnsureSessionIsActive middleware,
+    | regardless of the "expiration" setting above.
+    |
+    */
+
+    'idle_timeout_minutes' => env('SANCTUM_IDLE_TIMEOUT_MINUTES', 120),
+
 ];
