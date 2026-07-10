@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\ResetPasswordCode;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -99,6 +101,66 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Contraseña actualizada. Se cerró la sesión en todos los dispositivos.',
+        ]);
+    }
+
+    public function forgotPassword(Request $request)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'string', 'email'],
+        ]);
+
+        $user = User::where('email', $data['email'])->first();
+
+        if ($user) {
+            $code = (string) random_int(100000, 999999);
+
+            DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+            DB::table('password_reset_tokens')->insert([
+                'email' => $user->email,
+                'token' => Hash::make($code),
+                'created_at' => now(),
+            ]);
+
+            $user->notify(new ResetPasswordCode($code));
+        }
+
+        return response()->json([
+            'message' => 'Si el correo existe en nuestros registros, te enviamos un código de recuperación.',
+        ]);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'string', 'email'],
+            'code' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:6', 'confirmed'],
+        ]);
+
+        $record = DB::table('password_reset_tokens')->where('email', $data['email'])->first();
+
+        $isValid = $record
+            && Hash::check($data['code'], $record->token)
+            && now()->diffInMinutes($record->created_at) <= 15;
+
+        if (! $isValid) {
+            throw ValidationException::withMessages([
+                'code' => ['El código es inválido o ha expirado. Solicita uno nuevo.'],
+            ]);
+        }
+
+        $user = User::where('email', $data['email'])->first();
+
+        abort_if(! $user, 404);
+
+        $user->update(['password' => Hash::make($data['password'])]);
+        $user->tokens()->delete();
+
+        DB::table('password_reset_tokens')->where('email', $data['email'])->delete();
+
+        return response()->json([
+            'message' => 'Contraseña actualizada correctamente. Ya puedes iniciar sesión.',
         ]);
     }
 
